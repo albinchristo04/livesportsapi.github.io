@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DASH Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dashjs/4.7.1/dash.all.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 2em;
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .debug {
+            margin-top: 15px;
+            padding: 12px;
+            background: #2d3748;
+            color: #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏎️ Formula 1 DASH Player</h1>
+        
+        <div class="video-wrapper">
+            <video id="videoPlayer" controls></video>
+        </div>
+
+        <div class="controls">
+            <button onclick="playVideo()">▶ Play</button>
+            <button onclick="pauseVideo()">⏸ Pause</button>
+            <button onclick="reloadPlayer()">🔄 Reload</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="debug" class="debug" style="display:none;"></div>
+
+        <div class="info">
+            <strong>Stream Info:</strong><br>
+            Format: MPEG-DASH with ClearKey DRM<br>
+            Source: Formula 1 - Movistar Plus<br>
+            Key ID: 413b3adb78dd4684a7866819786b8836
+        </div>
+    </div>
+
+    <script>
+        const manifestUrl = 'http://formula1-dash-movistarplus.emisiondof6.com/manifest.mpd';
+        const keyId = '413b3adb78dd4684a7866819786b8836';
+        const key = '92d6e5cfbe02fef2e09e27617e3b9403';
+
+        let player;
+        const video = document.getElementById('videoPlayer');
+        const statusDiv = document.getElementById('status');
+        const debugDiv = document.getElementById('debug');
+
+        function showStatus(message, type = 'info') {
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+
+        function addDebugLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            debugDiv.style.display = 'block';
+            debugDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function initPlayer() {
+            try {
+                addDebugLog('Initializing dash.js player with ClearKey...');
+                
+                player = dashjs.MediaPlayer().create();
+                
+                // ClearKey protection data
+                const protectionData = {
+                    'org.w3.clearkey': {
+                        'clearkeys': {
+                            [keyId]: key
+                        }
+                    }
+                };
+
+                addDebugLog('Setting ClearKey protection data...');
+                addDebugLog('Key ID: ' + keyId);
+                addDebugLog('Key: ' + key);
+                
+                player.setProtectionData(protectionData);
+
+                // Event listeners
+                player.on(dashjs.MediaPlayer.events.ERROR, function(e) {
+                    const errorMsg = e.error?.message || e.error?.code || JSON.stringify(e.error);
+                    addDebugLog('ERROR: ' + errorMsg);
+                    showStatus('Error: ' + errorMsg, 'error');
+                });
+
+                player.on(dashjs.MediaPlayer.events.PLAYBACK_PLAYING, function() {
+                    addDebugLog('✓ Playback started successfully');
+                    showStatus('✓ Playing', 'success');
+                });
+
+                player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
+                    addDebugLog('Stream initialized');
+                    showStatus('Stream initialized', 'info');
+                });
+
+                player.on(dashjs.MediaPlayer.events.MANIFEST_LOADED, function(e) {
+                    addDebugLog('✓ Manifest loaded');
+                    showStatus('Manifest loaded, initializing DRM...', 'info');
+                });
+
+                player.on(dashjs.MediaPlayer.events.SOURCE_INITIALIZED, function() {
+                    addDebugLog('✓ Source initialized');
+                });
+
+                player.on(dashjs.MediaPlayer.events.PLAYBACK_METADATA_LOADED, function() {
+                    addDebugLog('✓ Metadata loaded');
+                });
+
+                player.on(dashjs.MediaPlayer.events.KEY_SYSTEM_SELECTED, function(e) {
+                    addDebugLog('✓ Key system selected: ' + (e.data?.keySystem || 'ClearKey'));
+                });
+
+                player.on(dashjs.MediaPlayer.events.KEY_ADDED, function() {
+                    addDebugLog('✓ ClearKey decryption key added successfully');
+                    showStatus('DRM key added, ready to play', 'success');
+                });
+
+                player.on(dashjs.MediaPlayer.events.KEY_ERROR, function(e) {
+                    addDebugLog('✗ KEY ERROR: ' + JSON.stringify(e));
+                    showStatus('DRM Key Error - Check keys', 'error');
+                });
+
+                player.on(dashjs.MediaPlayer.events.KEY_SESSION_CREATED, function() {
+                    addDebugLog('Key session created');
+                });
+
+                player.on(dashjs.MediaPlayer.events.PLAYBACK_ERROR, function(e) {
+                    addDebugLog('Playback error: ' + JSON.stringify(e));
+                });
+
+                addDebugLog('Attaching source: ' + manifestUrl);
+                player.initialize(video, manifestUrl, false);
+                
+                showStatus('Loading stream...', 'info');
+
+            } catch (error) {
+                addDebugLog('✗ INITIALIZATION ERROR: ' + error.message);
+                showStatus('Failed to initialize: ' + error.message, 'error');
+            }
+        }
+
+        function playVideo() {
+            if (video) {
+                video.play().catch(e => {
+                    addDebugLog('Play error: ' + e.message);
+                    showStatus('Play error: ' + e.message, 'error');
+                });
+            }
+        }
+
+        function pauseVideo() {
+            if (video) {
+                video.pause();
+                addDebugLog('Playback paused');
+                showStatus('Paused', 'info');
+            }
+        }
+
+        function reloadPlayer() {
+            debugDiv.innerHTML = '';
+            if (player) {
+                player.reset();
+            }
+            statusDiv.style.display = 'none';
+            setTimeout(initPlayer, 100);
+        }
+
+        // Initialize player on page load
+        window.addEventListener('load', initPlayer);
+    </script>
+</body>
+</html>
