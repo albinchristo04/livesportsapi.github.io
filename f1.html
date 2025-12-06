@@ -199,10 +199,8 @@
                 addDebugLog('Setting ClearKey protection data...');
                 addDebugLog('Key ID: ' + keyId);
                 addDebugLog('Key: ' + key);
-                
-                player.setProtectionData(protectionData);
 
-                // Event listeners
+                // Event listeners must be set BEFORE setProtectionData
                 player.on(dashjs.MediaPlayer.events.ERROR, function(e) {
                     const errorMsg = e.error?.message || e.error?.code || JSON.stringify(e.error);
                     addDebugLog('ERROR: ' + errorMsg);
@@ -253,6 +251,10 @@
                 player.on(dashjs.MediaPlayer.events.PLAYBACK_ERROR, function(e) {
                     addDebugLog('Playback error: ' + JSON.stringify(e));
                 });
+
+                // Set protection data AFTER event listeners are registered
+                addDebugLog('Registering ClearKey protection...');
+                player.setProtectionData(protectionData);
 
                 addDebugLog('Attaching source: ' + manifestUrl);
                 player.initialize(video, manifestUrl, false);
